@@ -1,55 +1,51 @@
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import bcrypt from "bcryptjs";
 import { connectMongoDB } from "@/lib/mongodb";
 import User from "@/models/User";
+import bcrypt from "bcryptjs";
 
-const handler = NextAuth({
+export const authOptions = {
   providers: [
     CredentialsProvider({
-      name: "Email & Password",
+      name: "Credentials",
       credentials: {
-        email: { label: "Email", type: "email", placeholder: "user@example.com" },
-        password: { label: "Password", type: "password" }
+        email: { label: "Email", type: "text" },
+        password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
         await connectMongoDB();
-
         const user = await User.findOne({ email: credentials.email });
-        if (!user) throw new Error("User not found");
 
-        const isPasswordValid = await bcrypt.compare(credentials.password, user.password);
-        if (!isPasswordValid) throw new Error("Invalid password");
+        if (!user || !bcrypt.compareSync(credentials.password, user.password)) {
+          throw new Error("Invalid email or password");
+        }
 
-        // Only allow admins to log in
-        if (!user.isAdmin) throw new Error("Access denied. Admins only");
-
-        return { id: user._id, username: user.username, isAdmin: user.isAdmin };
-      }
-    })
+        return { id: user._id, email: user.email, username: user.username, isAdmin: user.isAdmin };
+      },
+    }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id;
-        token.username = user.username;
-        token.isAdmin = user.isAdmin;
-      }
-      return token;
-    },
     async session({ session, token }) {
       if (token) {
         session.user.id = token.id;
+        session.user.isAdmin = token.isAdmin; // Include isAdmin in session
         session.user.username = token.username;
-        session.user.isAdmin = token.isAdmin;
       }
       return session;
-    }
+    },
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id;
+        token.isAdmin = user.isAdmin; // Include isAdmin in token
+        token.username = user.username;
+      }
+      return token;
+    },
   },
-  pages: {
-    signIn: "/login"
-  },
-  secret: process.env.NEXTAUTH_SECRET
-});
+  secret: process.env.NEXTAUTH_SECRET,
+  session: { strategy: "jwt" },
+  pages: { signIn: "/login" }, // Redirect to login page on failure
+};
 
+const handler = NextAuth(authOptions);
 export { handler as GET, handler as POST };

@@ -11,12 +11,13 @@ export default function Logforme() {
     const id = session?.user?.id;
 
     useEffect(() => {
-        if (status === "loading") return;
-        if (!session || !session.user.isAdmin) {
-            alert("Access denied. Admins only.");
-            router.push("/login");
+        if (!session) {
+          router.replace("/login");
+        } else if (!session.user.isAdmin) {
+          alert("You are not authorized to access this page.");
+          router.replace("/");
         }
-    }, [session, status, router]);
+      }, [session, router]);
 
     if (status === "loading") {
         return (
@@ -33,7 +34,7 @@ export default function Logforme() {
             <div className="flex flex-col gap-4 text-center">
                 <NavButton href={`/logforme/${id}/addskill`}>Add Skill</NavButton>
                 <NavButton href={`/logforme/${id}/addproject`}>Add Project</NavButton>
-                <NavButton href="/logforme/adddocument">Add Document</NavButton>
+                <NavButton href={`/logforme/${id}/adddocument`}>Add Document</NavButton>
             </div>
         </div>
     );
